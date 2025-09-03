@@ -1,0 +1,24 @@
+{
+  "siliconflow": {
+    "description": "硅基流动API配置",
+    "type": "object",
+    "properties": {
+      "api_key": {
+        "description": "硅基流动API密钥",
+        "type": "string",
+        "hint": "从 https://cloud.siliconflow.cn/ 获取API密钥"
+      },
+      "api_url": {
+        "description": "硅基流动API地址",
+        "type": "string",
+        "default": "https://api.siliconflow.cn/v1/images/generations"
+      },
+      "model": {
+        "description": "生成图片使用的模型",
+        "type": "string",
+        "default": "black-forest-labs/FLUX.1-schnell"
+      }
+    },
+    "required": ["api_key"]
+  }
+}

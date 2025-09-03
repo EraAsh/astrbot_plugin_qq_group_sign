@@ -1,0 +1,38 @@
+# 测试文件
+*test*.py
+test_*.py
+debug_*.py
+*debug*.py
+
+# 数据文件
+data/
+*.db
+*.sqlite
+*.json
+
+# 临时文件
+*.tmp
+*.temp
+*.log
+*.cache
+
+# Python 字节码
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# IDE 文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 操作系统文件
+.DS_Store
+Thumbs.db

@@ -1,0 +1,47 @@
+{
+    "admin_qq": {
+        "description": "管理员QQ号",
+        "type": "string",
+        "hint": "接收撤回消息通知的管理员QQ号，多个QQ号用逗号分隔",
+        "default": "",
+        "obvious_hint": true
+    },
+    "admin_group": {
+        "description": "管理群号",
+        "type": "string",
+        "hint": "接收撤回消息通知的管理群号，多个群号用逗号分隔",
+        "default": ""
+    },
+    "enable_group": {
+        "description": "启用群聊防撤回",
+        "type": "bool",
+        "hint": "是否监听群聊消息撤回",
+        "default": true
+    },
+    "enable_private": {
+        "description": "启用私聊防撤回",
+        "type": "bool",
+        "hint": "是否监听私聊消息撤回",
+        "default": true
+    },
+    "notify_format": {
+        "description": "通知格式",
+        "type": "string",
+        "hint": "撤回消息的通知格式，可用变量：{sender_name}, {sender_id}, {group_name}, {group_id}, {message_content}, {message_time}",
+        "default": "🚫 消息撤回提醒\n\n发送者：{sender_name}({sender_id})\n群聊：{group_name}({group_id})\n时间：{message_time}\n\n撤回内容：\n{message_content}"
+    },
+    "enable_ai_filter": {
+        "description": "启用AI过滤",
+        "type": "bool",
+        "hint": "是否使用AI过滤重要消息才通知",
+        "default": false
+    },
+    "ai_filter_prompt": {
+        "description": "AI过滤提示词",
+        "type": "text",
+        "hint": "AI判断消息重要性的提示词",
+        "default": "请判断以下消息是否重要，重要消息包括但不限于：包含重要信息、联系方式、地址、金钱交易、工作安排、学习资料等。如果重要，回复'important'，否则回复'not_important'。只回复这两个词之一。",
+        "editor_mode": true,
+        "editor_language": "text"
+    }
+}
