@@ -13,7 +13,7 @@ from astrbot.api.message_components import Plain, At
 from astrbot.api import logger
 from astrbot.api import AstrBotConfig
 
-@register("qq_group_sign", "EraAsh", "QQ群打卡插件，支持自动定时打卡、白名单模式、管理员通知等功能", "2.0.0", "https://github.com/EraAsh/astrbot_plugin_qq_group_sign")
+@register("qq_group_sign", "EraAsh", "QQ群打卡插件，支持自动定时打卡、白名单模式、管理员通知等功能", "2.1.0", "https://github.com/EraAsh/astrbot_plugin_qq_group_sign")
 class QQGroupSignPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -389,8 +389,6 @@ class QQGroupSignPlugin(Star):
                 yield event.chain_result([Plain("❌ 请在群聊中使用此命令")])
                 return
             
-            yield event.chain_result([Plain(f"🔄 正在为当前群 {group_id} 执行打卡...")])
-            
             result = await self._perform_group_sign(group_id)
             
             if result["success"]:
@@ -400,7 +398,7 @@ class QQGroupSignPlugin(Star):
                 self.sign_statistics["last_sign_time"] = datetime.now().isoformat()
                 await self._save_config()
                 
-                yield event.chain_result([Plain(f"✅ 群 {group_id} 打卡成功")])
+                yield event.chain_result([Plain(f"✅ 打卡成功")])
                 
                 # 通知管理员
                 await self._notify_admin(f"群 {group_id} 手动打卡成功")
@@ -409,7 +407,7 @@ class QQGroupSignPlugin(Star):
                 self.sign_statistics["fail_count"] += 1
                 await self._save_config()
                 
-                yield event.chain_result([Plain(f"❌ 群 {group_id} 打卡失败: {result['message']}")])
+                yield event.chain_result([Plain(f"❌ 打卡失败: {result['message']}")])
                 await self._notify_admin(f"群 {group_id} 手动打卡失败: {result['message']}")
             
         except Exception as e:
