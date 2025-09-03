@@ -33,10 +33,10 @@ class QQGroupSignPlugin(Star):
         self.is_active = self.config.get("enable_auto_sign", True)
         self._stop_event = asyncio.Event()
         self.timezone = timezone(timedelta(hours=self.config.get("timezone", 8)))
-        self._session: Optional[aiohttp.ClientSession] = None
         self.debug_mode = False
         self.bot_instance = None
         self.platform_name = ""
+        self._initialized = asyncio.Event()
         
         # 解析打卡时间
         sign_time_str = self.config.get("sign_time", "08:00:00")
@@ -57,6 +57,7 @@ class QQGroupSignPlugin(Star):
         )
         if self.is_active:
             await self._start_sign_task()
+        self._initialized.set()
 
     def _get_next_run_time(self) -> datetime:
         """计算下一次任务执行的本地时间"""
@@ -177,7 +178,10 @@ class QQGroupSignPlugin(Star):
             # 回退方法：发送普通消息
             sign_message = self.config.get("sign_message", "打卡成功！")
             message_chain = [Plain(sign_message)]
-            session_str = f"{self.platform_name or 'aiocqhttp'}:group:{group_id}"
+            
+            # 使用 AstrBot 标准的会话标识符格式
+            # 根据 AstrBot 文档，正确的格式应该是 "platform_name:GROUP:group_id"
+            session_str = f"{self.platform_name or 'aiocqhttp'}:GROUP:{group_id}"
             await self.context.send_message(session_str, message_chain)
             
             logger.info(f"群 {group_id} 打卡成功 (回退模式)")
@@ -215,7 +219,8 @@ class QQGroupSignPlugin(Star):
                     logger.warning(f"平台 API 通知失败: {api_error}，使用回退方法")
 
             # 回退方法：使用 context.send_message
-            session_str = f"{self.platform_name or 'aiocqhttp'}:group:{admin_group_id}"
+            # 使用正确的 AstrBot 会话标识符格式
+            session_str = f"{self.platform_name or 'aiocqhttp'}:GROUP:{admin_group_id}"
             await self.context.send_message(session_str, [Plain(notification_msg)])
             logger.info(f"管理员通知已通过 context.send_message 发送至群 {admin_group_id}")
 
@@ -290,62 +295,74 @@ class QQGroupSignPlugin(Star):
 
     async def _daily_sign_task(self):
         """每日定时打卡任务"""
-        while not self._stop_event.is_set():
-            try:
-                now = self._get_local_time()
-                target_time = now.replace(
-                    hour=self.sign_time.hour,
-                    minute=self.sign_time.minute,
-                    second=self.sign_time.second,
-                    microsecond=0
-                )
-                
-                if now >= target_time:
-                    target_time += timedelta(days=1)
-                
-                wait_seconds = (target_time - now).total_seconds()
-                if wait_seconds > 86400:
-                    logger.warning(f"等待时间异常长: {wait_seconds}秒，重置为明天")
+        try:
+            while not self._stop_event.is_set():
+                # 将内部的 try...except Exception 块保持原样，以处理循环内的特定错误
+                try:
+                    now = self._get_local_time()
                     target_time = now.replace(
                         hour=self.sign_time.hour,
                         minute=self.sign_time.minute,
                         second=self.sign_time.second,
                         microsecond=0
-                    ) + timedelta(days=1)
+                    )
+                    
+                    if now >= target_time:
+                        target_time += timedelta(days=1)
+                    
                     wait_seconds = (target_time - now).total_seconds()
+                    if wait_seconds > 86400:
+                        logger.warning(f"等待时间异常长: {wait_seconds}秒，重置为明天")
+                        target_time = now.replace(
+                            hour=self.sign_time.hour,
+                            minute=self.sign_time.minute,
+                            second=self.sign_time.second,
+                            microsecond=0
+                        ) + timedelta(days=1)
+                        wait_seconds = (target_time - now).total_seconds()
+                    
+                    logger.info(f"距离下次打卡还有 {wait_seconds:.1f}秒 (将在 {target_time} 执行)")
+                    
+                    try:
+                        await asyncio.wait_for(self._stop_event.wait(), timeout=wait_seconds)
+                        if self._stop_event.is_set():
+                            break
+                    except asyncio.TimeoutError:
+                        pass
+                    
+                    logger.info("开始执行每日打卡...")
+                    
+                    # 确定要打卡的群组
+                    if self.config.get("whitelist_mode", False):
+                        target_groups = self.whitelist_groups
+                    else:
+                        target_groups = await self._get_all_groups()
+                        if not target_groups:
+                            logger.warning("没有找到任何群聊，请检查配置或使用白名单模式")
+                            await self._notify_admin("自动打卡失败：没有找到任何群聊")
+                    
+                    if target_groups:
+                        result = await self._sign_target_groups(target_groups)
+                        logger.info(f"打卡完成: {result}")
+                    else:
+                        logger.warning("没有可打卡的群组")
+                        await self._notify_admin("自动打卡失败：没有可打卡的群组")
+                    
+                    await asyncio.sleep(1)  # 防止CPU占用过高
                 
-                logger.info(f"距离下次打卡还有 {wait_seconds:.1f}秒 (将在 {target_time} 执行)")
-                
-                try:
-                    await asyncio.wait_for(self._stop_event.wait(), timeout=wait_seconds)
-                    if self._stop_event.is_set():
-                        break
-                except asyncio.TimeoutError:
-                    pass
-                
-                logger.info("开始执行每日打卡...")
-                
-                # 确定要打卡的群组
-                if self.config.get("whitelist_mode", False):
-                    target_groups = self.whitelist_groups
-                else:
-                    target_groups = await self._get_all_groups()
-                    if not target_groups:
-                        logger.warning("没有找到任何群聊，请检查配置或使用白名单模式")
-                        await self._notify_admin("自动打卡失败：没有找到任何群聊")
-                
-                if target_groups:
-                    result = await self._sign_target_groups(target_groups)
-                    logger.info(f"打卡完成: {result}")
-                else:
-                    logger.warning("没有可打卡的群组")
-                    await self._notify_admin("自动打卡失败：没有可打卡的群组")
-                
-                await asyncio.sleep(1)  # 防止CPU占用过高
-                
-            except Exception as e:
-                logger.error(f"自动打卡任务出错: {e}")
-                await asyncio.sleep(60)  # 出错后等待60秒再重试
+                except aiohttp.ClientError as e:
+                    logger.error(f"自动打卡任务网络错误: {e}", exc_info=True)
+                    await self._notify_admin(f"自动打卡失败：网络错误 {e}")
+                    await asyncio.sleep(300)  # 网络问题，等待更长时间
+                except Exception as e:
+                    logger.error(f"自动打卡任务内部循环出错: {e}", exc_info=True)
+                    await self._notify_admin(f"自动打卡失败：发生未知错误 {e}")
+                    await asyncio.sleep(60)  # 其他错误，等待60秒
+        except asyncio.CancelledError:
+            logger.info("自动打卡任务被取消")
+            # 任务被取消时，安静退出即可，无需重新抛出
+        except Exception as e:
+            logger.error(f"自动打卡任务异常终止: {e}", exc_info=True)
 
     @filter.event_message_type(filter.EventMessageType.ALL, priority=999)
     async def _capture_bot_instance(self, event: AstrMessageEvent):
@@ -364,6 +381,7 @@ class QQGroupSignPlugin(Star):
     @filter.command("打卡", alias=["群打卡"])
     async def group_sign(self, event: AstrMessageEvent):
         """在当前群聊执行打卡"""
+        await self._initialized.wait()
         try:
             # 获取当前群聊ID
             group_id = event.get_group_id()
@@ -402,6 +420,7 @@ class QQGroupSignPlugin(Star):
     @filter.command("全群打卡", alias=["打卡所有群"])
     async def sign_all_groups(self, event: AstrMessageEvent):
         """打卡所有群聊"""
+        await self._initialized.wait()
         try:
             # 获取所有群聊列表
             target_groups = await self._get_all_groups()
@@ -458,6 +477,7 @@ class QQGroupSignPlugin(Star):
     @filter.command("添加白名单", alias=["加白名单"])
     async def add_whitelist(self, event: AstrMessageEvent, group_id: str):
         """添加群号到白名单"""
+        await self._initialized.wait()
         try:
             group_id = group_id.strip()
             if group_id not in self.whitelist_groups:
@@ -475,6 +495,7 @@ class QQGroupSignPlugin(Star):
     @filter.command("移除白名单", alias=["删白名单"])
     async def remove_whitelist(self, event: AstrMessageEvent, group_id: str):
         """从白名单中移除群号"""
+        await self._initialized.wait()
         try:
             group_id = group_id.strip()
             if group_id in self.whitelist_groups:
@@ -492,6 +513,7 @@ class QQGroupSignPlugin(Star):
     @filter.command("查看白名单", alias=["白名单列表"])
     async def view_whitelist(self, event: AstrMessageEvent):
         """查看白名单列表"""
+        await self._initialized.wait()
         if self.whitelist_groups:
             message = f"📋 当前白名单群组:\n{', '.join(self.whitelist_groups)}"
         else:
@@ -501,6 +523,7 @@ class QQGroupSignPlugin(Star):
     @filter.command("打卡状态", alias=["打卡统计"])
     async def sign_status(self, event: AstrMessageEvent):
         """查看打卡状态和统计"""
+        await self._initialized.wait()
         status = "🟢 自动打卡已开启" if self.is_active else "🔴 自动打卡已停止"
         mode = "📝 白名单模式" if self.config.get("whitelist_mode", False) else "🌐 全群模式"
         
@@ -527,6 +550,7 @@ class QQGroupSignPlugin(Star):
     @filter.command("开启自动打卡", alias=["启动打卡"])
     async def start_auto_sign(self, event: AstrMessageEvent):
         """开启自动打卡"""
+        await self._initialized.wait()
         self.is_active = True
         self.config["enable_auto_sign"] = True
         self.config.save_config()
@@ -543,6 +567,7 @@ class QQGroupSignPlugin(Star):
     @filter.command("关闭自动打卡", alias=["停止打卡"])
     async def stop_auto_sign(self, event: AstrMessageEvent):
         """关闭自动打卡"""
+        await self._initialized.wait()
         if self.is_active:
             self._stop_event.set()
             self.is_active = False
@@ -567,6 +592,7 @@ class QQGroupSignPlugin(Star):
     @filter.command("设置打卡时间", alias=["打卡时间"])
     async def set_sign_time(self, event: AstrMessageEvent, time_str: str):
         """设置打卡时间"""
+        await self._initialized.wait()
         try:
             hour, minute, second = map(int, time_str.split(':'))
             if not (0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59):
@@ -586,6 +612,7 @@ class QQGroupSignPlugin(Star):
     @filter.command("切换模式", alias=["打卡模式"])
     async def toggle_mode(self, event: AstrMessageEvent):
         """切换打卡模式（白名单/全群）"""
+        await self._initialized.wait()
         current_mode = self.config.get("whitelist_mode", False)
         new_mode = not current_mode
         self.config["whitelist_mode"] = new_mode
@@ -604,8 +631,5 @@ class QQGroupSignPlugin(Star):
                 await self.task
             except asyncio.CancelledError:
                 pass
-        
-        if self._session and not self._session.closed:
-            await self._session.close()
         
         logger.info("QQ群打卡插件已终止")
