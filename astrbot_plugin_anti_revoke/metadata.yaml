@@ -1,0 +1,5 @@
+name: astrbot_plugin_anti_revoke
+desc: QQ防撤回插件，监听QQ群和个人消息撤回事件，自动转发撤回消息给管理员或指定管理群
+version: v1.0.0
+author: EraAsh
+repo: https://github.com/EraAsh/astrbot_plugin_anti_revoke

@@ -1,0 +1,5 @@
+name: astrbot_plugin_image_generation
+desc: 基于硅基流动API的AI自主绘图插件，可自动识别用户绘图意图并生成图片
+version: v1.0.0
+author: EraAsh
+repo: https://github.com/EraAsh/astrbot_plugin_image_generation
