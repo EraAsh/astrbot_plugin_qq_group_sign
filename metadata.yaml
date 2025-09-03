@@ -1,0 +1,5 @@
+name: qq_group_sign
+description: QQ群打卡插件，支持自动定时打卡、白名单模式、管理员通知等功能
+version: v2.0.0
+author: EraAsh
+repo: https://github.com/EraAsh/astrbot_plugin_qq_group_sign
