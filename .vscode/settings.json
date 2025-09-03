@@ -1,4 +1,0 @@
-{
-    // 配置 Git 可执行文件路径
-    "git.path": "F:\VScode插件\PortableGit\bin\git.exe"
-}

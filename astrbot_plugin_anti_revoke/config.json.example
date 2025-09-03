@@ -1,9 +1,0 @@
-{
-    "admin_qq": "123456789,987654321",
-    "admin_group": "123456789,987654321",
-    "enable_group": true,
-    "enable_private": true,
-    "notify_format": "🚫 消息撤回提醒\n\n发送者：{sender_name}({sender_id})\n群聊：{group_name}({group_id})\n时间：{message_time}\n\n撤回内容：\n{message_content}",
-    "enable_ai_filter": false,
-    "ai_filter_prompt": "请判断以下消息是否重要，重要消息包括但不限于：包含重要信息、联系方式、地址、金钱交易、工作安排、学习资料等。如果重要，回复'important'，否则回复'not_important'。只回复这两个词之一。"
-}
