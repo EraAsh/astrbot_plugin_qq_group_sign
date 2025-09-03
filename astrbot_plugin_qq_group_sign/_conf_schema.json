@@ -1,0 +1,44 @@
+{
+  "sign_time": {
+    "description": "每日打卡时间",
+    "type": "string",
+    "hint": "格式：HH:MM:SS，例如 08:00:00",
+    "default": "08:00:00"
+  },
+  "timezone": {
+    "description": "时区设置",
+    "type": "int",
+    "hint": "东八区为8",
+    "default": 8
+  },
+  "enable_auto_sign": {
+    "description": "启用自动打卡",
+    "type": "bool",
+    "hint": "是否开启自动定时打卡功能",
+    "default": true
+  },
+  "whitelist_mode": {
+    "description": "白名单模式",
+    "type": "bool",
+    "hint": "true=只打卡白名单群聊，false=打卡所有群聊",
+    "default": false
+  },
+  "admin_notification": {
+    "description": "管理员通知",
+    "type": "bool",
+    "hint": "打卡完成后是否通知管理员",
+    "default": true
+  },
+  "admin_group_id": {
+    "description": "管理群号",
+    "type": "string",
+    "hint": "接收打卡通知的管理群号，留空则私信管理员",
+    "default": ""
+  },
+  "sign_message": {
+    "description": "打卡消息内容",
+    "type": "string",
+    "hint": "打卡时发送的消息内容",
+    "default": "打卡成功！"
+  }
+}
