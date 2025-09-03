@@ -1,2 +1,0 @@
-requests>=2.31.0
-emoji>=2.8.0
