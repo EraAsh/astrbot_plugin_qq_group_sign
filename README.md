@@ -169,6 +169,14 @@ A: 重启插件或检查配置文件权限
 
 欢迎提交 Issue 和 Pull Request 来改进这个插件！
 
----
+提示：使用前请确保已正确配置 AstrBot 和相关权限
 
-> 提示：使用前请确保已正确配置 AstrBot 和相关权限
+---
+>
+<div align="center">
+
+**⭐ 如果这个项目对您有帮助，请考虑给我们一个 Star！**
+
+![Star History](https://img.shields.io/github/stars/EraAsh/astrbot_plugin_qq_group_sign?style=social)
+
+</div>
