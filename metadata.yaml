@@ -1,8 +1,8 @@
 name: qq_group_sign
 display_name: QQ群打卡
-description: QQ群自动定时打卡插件，支持 send_group_sign API 签到、白名单模式、管理员通知、统计等功能。支持 LLBot / NapCat
+description: QQ群自动定时打卡插件，支持 send_group_sign API 签到、白名单/黑名单模式、管理员通知、统计等功能。支持 LLBot / NapCat
 short_desc: 直接调用签到 API 为所有/指定群聊执行每日打卡
-version: v2.3.0
+version: v2.3.1
 author: EraAsh
 repo: https://github.com/EraAsh/astrbot_plugin_qq_group_sign
 support_platforms:

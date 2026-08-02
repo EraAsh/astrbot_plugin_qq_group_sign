@@ -15,8 +15,8 @@ from astrbot.api import AstrBotConfig
 @register(
     "qq_group_sign",
     "EraAsh",
-    "QQ群打卡插件，支持自动定时打卡、白名单模式、管理员通知等功能",
-    "2.3.0",
+    "QQ群打卡插件，支持自动定时打卡、白名单/黑名单模式、管理员通知等功能",
+    "2.3.1",
     "https://github.com/EraAsh/astrbot_plugin_qq_group_sign",
 )
 class QQGroupSignPlugin(Star):
@@ -29,6 +29,7 @@ class QQGroupSignPlugin(Star):
 
         self.task: Optional[asyncio.Task] = None
         self.whitelist_groups: List[str] = []
+        self.blacklist_groups: List[str] = []
         self.sign_statistics: Dict[str, Any] = {
             "total_signs": 0,
             "success_count": 0,
@@ -81,6 +82,7 @@ class QQGroupSignPlugin(Star):
         """异步加载配置文件"""
         default_values = {
             "whitelist_groups": [],
+            "blacklist_groups": [],
             "sign_statistics": {
                 "total_signs": 0,
                 "success_count": 0,
@@ -108,6 +110,10 @@ class QQGroupSignPlugin(Star):
                     if "whitelist_groups" in loaded_data:
                         loaded_data["whitelist_groups"] = [
                             str(gid) for gid in loaded_data["whitelist_groups"]
+                        ]
+                    if "blacklist_groups" in loaded_data:
+                        loaded_data["blacklist_groups"] = [
+                            str(gid) for gid in loaded_data["blacklist_groups"]
                         ]
 
                     for key in default_values:
@@ -140,6 +146,7 @@ class QQGroupSignPlugin(Star):
         temp_path = f"{self.storage_file}.tmp"
         data = {
             "whitelist_groups": self.whitelist_groups,
+            "blacklist_groups": self.blacklist_groups,
             "sign_statistics": self.sign_statistics,
         }
 
@@ -305,6 +312,13 @@ class QQGroupSignPlugin(Star):
         )
         return []
 
+    async def _get_sign_target_groups(self) -> List[str]:
+        """根据白名单/黑名单模式确定要打卡的群组"""
+        if self.config.get("whitelist_mode", False):
+            return self.whitelist_groups
+        all_groups = await self._get_all_groups()
+        return [g for g in all_groups if g not in self.blacklist_groups]
+
     async def _build_origin_reply(self, event: AstrMessageEvent, message: str):
         """构造仅回发到指令来源会话的消息"""
         try:
@@ -357,15 +371,7 @@ class QQGroupSignPlugin(Star):
                     logger.info("开始执行每日打卡...")
 
                     # 确定要打卡的群组
-                    if self.config.get("whitelist_mode", False):
-                        target_groups = self.whitelist_groups
-                    else:
-                        target_groups = await self._get_all_groups()
-                        if not target_groups:
-                            logger.warning(
-                                "没有找到任何群聊，请检查配置或使用白名单模式"
-                            )
-                            await self._notify_admin("自动打卡失败：没有找到任何群聊")
+                    target_groups = await self._get_sign_target_groups()
 
                     if target_groups:
                         result = await self._sign_target_groups(target_groups)
@@ -446,10 +452,9 @@ class QQGroupSignPlugin(Star):
         """打卡所有群聊，不在群内回消息"""
         await self._initialized.wait()
         try:
-            target_groups = await asyncio.wait_for(self._get_all_groups(), timeout=15)
-            if not target_groups:
-                # 如果无法获取所有群聊，使用白名单群组
-                target_groups = self.whitelist_groups
+            target_groups = await asyncio.wait_for(
+                self._get_sign_target_groups(), timeout=15
+            )
 
             if not target_groups:
                 reply = await self._build_origin_reply(
@@ -495,12 +500,17 @@ class QQGroupSignPlugin(Star):
 • /查看白名单 - 查看白名单列表
 • /切换模式 - 切换白名单/全群模式
 
+🚫 黑名单管理：
+• /添加黑名单 [群号] - 添加群号到黑名单（全群模式下跳过）
+• /移除黑名单 [群号] - 从黑名单移除群号
+• /查看黑名单 - 查看黑名单列表
+
 📊 其他功能：
 • /打卡菜单 - 显示此帮助菜单
 
 💡 使用提示：
 • 白名单模式下只对白名单群组执行打卡
-• 全群模式下对所有群聊执行打卡
+• 全群模式下对所有群聊执行打卡（黑名单中的群除外）
 • 自动打卡时间支持时分秒格式设置
         """
         yield event.chain_result([Plain(menu_text)])
@@ -557,6 +567,60 @@ class QQGroupSignPlugin(Star):
             message = f"📋 当前白名单群组:\n{', '.join(self.whitelist_groups)}"
         else:
             message = "📋 当前白名单为空"
+        yield event.chain_result([Plain(message)])
+
+    @filter.command("添加黑名单", alias=["加黑名单"])
+    async def add_blacklist(self, event: AstrMessageEvent, group_id: str):
+        """添加群号到黑名单"""
+        await self._initialized.wait()
+        try:
+            group_id = group_id.strip()
+            if group_id not in self.blacklist_groups:
+                self.blacklist_groups.append(group_id)
+                await self._save_config()
+                yield event.chain_result(
+                    [
+                        Plain(
+                            f"✅ 已添加群号 {group_id} 到黑名单\n"
+                            f"🚫 当前黑名单: {', '.join(self.blacklist_groups)}"
+                        )
+                    ]
+                )
+            else:
+                yield event.chain_result([Plain(f"ℹ️ 群号 {group_id} 已在黑名单中")])
+        except Exception as e:
+            yield event.chain_result([Plain(f"❌ 添加失败: {e}")])
+
+    @filter.command("移除黑名单", alias=["删黑名单"])
+    async def remove_blacklist(self, event: AstrMessageEvent, group_id: str):
+        """从黑名单中移除群号"""
+        await self._initialized.wait()
+        try:
+            group_id = group_id.strip()
+            if group_id in self.blacklist_groups:
+                self.blacklist_groups.remove(group_id)
+                await self._save_config()
+                yield event.chain_result(
+                    [
+                        Plain(
+                            f"✅ 已从黑名单移除群号 {group_id}\n"
+                            f"🚫 当前黑名单: {', '.join(self.blacklist_groups) if self.blacklist_groups else '无'}"
+                        )
+                    ]
+                )
+            else:
+                yield event.chain_result([Plain(f"ℹ️ 群号 {group_id} 不在黑名单中")])
+        except Exception as e:
+            yield event.chain_result([Plain(f"❌ 移除失败: {e}")])
+
+    @filter.command("查看黑名单", alias=["黑名单列表"])
+    async def view_blacklist(self, event: AstrMessageEvent):
+        """查看黑名单列表"""
+        await self._initialized.wait()
+        if self.blacklist_groups:
+            message = f"🚫 当前黑名单群组:\n{', '.join(self.blacklist_groups)}"
+        else:
+            message = "🚫 当前黑名单为空"
         yield event.chain_result([Plain(message)])
 
     @filter.command("打卡状态", alias=["打卡统计"])
