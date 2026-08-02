@@ -216,7 +216,9 @@ class QQGroupSignPlugin(Star):
 
             # 回退方法：使用 context.send_message
             # 使用正确的 AstrBot 会话标识符格式
-            session_str = f"{self.platform_name or 'aiocqhttp'}:GroupMessage:{admin_group_id}"
+            session_str = (
+                f"{self.platform_name or 'aiocqhttp'}:GroupMessage:{admin_group_id}"
+            )
             await self.context.send_message(session_str, [Plain(notification_msg)])
             logger.info(
                 f"管理员通知已通过 context.send_message 发送至群 {admin_group_id}"
@@ -269,7 +271,11 @@ class QQGroupSignPlugin(Star):
                 fail_count += 1
 
             if status == "fail":
-                messages.append(f"群 {group_id} ❌ {result.get('message', '')}" if isinstance(result, dict) else f"群 {group_id} ❌")
+                messages.append(
+                    f"群 {group_id} ❌ {result.get('message', '')}"
+                    if isinstance(result, dict)
+                    else f"群 {group_id} ❌"
+                )
         # 更新统计信息
         self.sign_statistics["total_signs"] += len(group_list)
         self.sign_statistics["success_count"] += success_count
@@ -439,7 +445,9 @@ class QQGroupSignPlugin(Star):
 
         except Exception as e:
             logger.error(f"手动打卡失败: {str(e)}", exc_info=True)
-            await self._notify_admin(f"群 {event.get_group_id() or 'unknown'} 手动打卡异常: {str(e)}")
+            await self._notify_admin(
+                f"群 {event.get_group_id() or 'unknown'} 手动打卡异常: {str(e)}"
+            )
 
     @filter.regex(r".*全群打卡.*")
     async def sign_all_groups(self, event: AstrMessageEvent):
@@ -458,7 +466,9 @@ class QQGroupSignPlugin(Star):
                 )
                 if reply:
                     yield reply
-                await self._notify_admin("全群打卡失败：没有可打卡的群组，请先配置白名单群组")
+                await self._notify_admin(
+                    "全群打卡失败：没有可打卡的群组，请先配置白名单群组"
+                )
                 return
 
             result = await self._sign_target_groups(target_groups)
