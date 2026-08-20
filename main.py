@@ -170,23 +170,58 @@ class QQGroupSignPlugin(Star):
         return datetime.now(self.timezone)
 
     async def _perform_group_sign(self, group_id: Union[str, int]) -> dict:
-        """执行群打卡 - 直接调用签到 API，不发文本消息"""
-        try:
-            if not self.bot_instance:
-                return {"success": False, "message": "bot 实例未捕获"}
+        """执行群打卡 - 支持 API 签到和文本签到两种方式"""
+        sign_method = self.config.get("sign_method", "api")
+        group_id_int = int(group_id)
 
-            await self.bot_instance.api.call_action(
-                "send_group_sign",
-                group_id=int(group_id),
-            )
+        # API 签到（默认方式，调用 send_group_sign）
+        if sign_method == "api" or sign_method == "both":
+            try:
+                if not self.bot_instance:
+                    return {"success": False, "message": "bot 实例未捕获"}
 
-            logger.info(f"群 {group_id} 打卡完成")
-            return {"success": True, "message": "打卡完成"}
+                await self.bot_instance.api.call_action(
+                    "send_group_sign",
+                    group_id=group_id_int,
+                )
 
-        except Exception as e:
-            error_msg = f"{str(e)}"
-            logger.error(f"群 {group_id} 打卡失败: {error_msg}")
-            return {"success": False, "message": error_msg}
+                logger.info(f"群 {group_id} 打卡完成 (API)")
+                if sign_method == "api":
+                    return {"success": True, "message": "打卡完成"}
+
+                # both 模式：API 成功也继续发文本签到
+            except Exception as e:
+                error_msg = f"{str(e)}"
+                logger.warning(f"群 {group_id} API 签到失败: {error_msg}")
+                if sign_method == "api":
+                    return {"success": False, "message": error_msg}
+                # both 模式：API 失败，回退到文本签到
+
+        # 文本签到（发送签到指令到群）
+        if sign_method == "text" or sign_method == "both":
+            try:
+                sign_text = self.config.get("sign_text", "/sign")
+                if self.bot_instance:
+                    await self.bot_instance.api.call_action(
+                        "send_group_msg",
+                        group_id=group_id_int,
+                        message=sign_text,
+                    )
+                else:
+                    # 通过 context 发送
+                    session_str = f"{self.platform_name or 'aiocqhttp'}:GroupMessage:{group_id_int}"
+                    await self.context.send_message(
+                        session_str,
+                        [Plain(sign_text)],
+                    )
+                logger.info(f"群 {group_id} 文本签到已发送: {sign_text}")
+                return {"success": True, "message": f"已发送签到指令: {sign_text}"}
+            except Exception as e:
+                error_msg = f"文本签到失败: {e}"
+                logger.error(f"群 {group_id} {error_msg}")
+                return {"success": False, "message": error_msg}
+
+        return {"success": False, "message": f"未知的签到方式: {sign_method}"}
 
     async def _notify_admin(self, message: str):
         """通知管理员"""

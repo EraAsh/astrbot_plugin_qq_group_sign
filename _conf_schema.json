@@ -40,5 +40,17 @@
         "type": "string",
         "hint": "打卡时发送的消息内容",
         "default": "打卡成功"
+    },
+    "sign_method": {
+        "description": "签到方式",
+        "type": "string",
+        "hint": "api=调用签到API(默认，推荐LLBot/NapCat)，text=发送文本签到指令到群（适合签到API不可用时）",
+        "default": "api"
+    },
+    "sign_text": {
+        "description": "文本签到指令",
+        "type": "string",
+        "hint": "text签到方式下发到群的消息内容，如 /sign 或 签到",
+        "default": "/sign"
     }
 }
